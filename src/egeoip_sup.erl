@@ -21,7 +21,10 @@ init([]) ->
 		   city
 	   end,
     Processes = worker(tuple_to_list(worker_names()), File),
-    {ok, {{one_for_one, 5, 300}, Processes}}.
+    SharedState = {shared_state,
+      {egeoip_shared_state, start_link, []},
+      permanent, 5000, worker, [egeoip_shared_state]},
+    {ok, {{one_for_all, 5, 300}, [SharedState|Processes]}}.
 
 worker_names() ->
     {egeoip_0,

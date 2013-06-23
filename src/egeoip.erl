@@ -236,15 +236,15 @@ new() ->
 new(city) ->
     new(default_db(["GeoIPCity.dat", "GeoLiteCity.dat"]));
 new(Path) ->
-    case filelib:is_file(Path) of
-        true ->
-            Data = load_file(Path),
+    case load_file(Path) of
+        {ok, Data} ->
             Max = ?STRUCTURE_INFO_MAX_SIZE,
             State = read_structures(Path, Data, size(Data) - 3, Max),
             ok = check_state(State),
+            erlang:garbage_collect(self()),
             {ok, State};
-        false ->
-	    {error, {geoip_db_not_found,Path}}
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 %% @spec lookup(D::geoipdb(), Addr) -> {ok, geoip()}
@@ -480,15 +480,7 @@ priv_path(Components) ->
     filename:join([AppDir, "priv" | Components]).
 
 load_file(Path) ->
-    case file:read_file(Path) of
-        {ok, Raw} ->
-            case filename:extension(Path) of
-                ".gz" ->
-                    zlib:gunzip(Raw);
-                _ ->
-                    Raw
-            end
-    end.
+    egeoip_shared_state:get_file(Path).
 
 benchcall(Fun, 1) ->
     Fun();
