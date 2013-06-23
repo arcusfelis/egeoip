@@ -12,8 +12,7 @@ run_test_() ->
        {"egeoip_lookup", fun egeoip_lookup/0},
        {"egeoip_reserved", {generator, fun egeoip_reserved_gen/0}},
        {"country_test", {generator, fun country_test_gen/0}},
-       {"country_test2", {generator, fun country_test2_gen/0}},
-       {"non_parallel", fun non_parallel/0}]}}.
+       {"country_test2", {generator, fun country_test2_gen/0}}]}}.
 
 egeoip_reserved_gen() ->
     %% We don't test all of them, just a few.
@@ -57,25 +56,6 @@ egeoip_lookup() ->
     {ok, R1} = egeoip:lookup("24.24.24.24"),
     {ok, R2} = egeoip:lookup({24,24,24,24}),
     ?assertEqual(R1,R2).
-
-non_parallel() ->
-    %% recreate the non-parallelized version of egeoip and then verify
-    %% that the upgrade works.
-    Workers = [Egeoip | T] = tuple_to_list(egeoip_sup:worker_names()),
-    %% Remove all worker processes except for the first one
-    lists:map(fun(Worker) ->
-                      ok = supervisor:terminate_child(egeoip_sup, Worker),
-                      ok = supervisor:delete_child(egeoip_sup, Worker)
-              end, T),
-    Pid = whereis(Egeoip),
-    unregister(Egeoip),
-    register(egeoip, Pid),
-    ?assert(Pid == whereis(egeoip)),
-    [?assert(undefined == whereis(W)) || W <- Workers],
-    %% Should upgrade when calling lookup
-    {ok, _R} = egeoip:lookup("24.24.24.24"),
-    ?assert(undefined == whereis(egeoip)),
-    [?assertNot(undefined == whereis(W)) || W <- Workers].
 
 no_egeoip_test() ->
     Lookup = {lookup, "24.24.24.24"},

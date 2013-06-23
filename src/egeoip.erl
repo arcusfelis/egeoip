@@ -80,7 +80,7 @@ reload() ->
 reload(FileName) ->
     case new(FileName) of
         {ok, NewState} ->
-            Workers = egeoip_sup:worker_names(),
+            Workers = egeoip_pool:worker_names(),
             [gen_server:call(W, {reload, NewState})  || W <- tuple_to_list(Workers)];
         Error ->
             Error
@@ -120,21 +120,8 @@ stop() ->
 %% @doc Get a geoip() record for the given address. Fields can be obtained
 %%      from the record using get/2.
 lookup(Address) when is_integer(Address) ->
-    case whereis(egeoip) of
-        undefined ->
-            Worker = get_worker(Address),
-            gen_server:call(Worker, {lookup, Address});
-        Pid ->
-            unregister(egeoip),
-            register(egeoip_0, Pid),
-            FileName = gen_server:call(Pid, filename),
-            [egeoip_0 | Workers] = tuple_to_list(egeoip_sup:worker_names()),
-            Specs = egeoip_sup:worker(Workers, FileName),
-            lists:map(fun(Spec) ->
-                              {ok, _Pid} = supervisor:start_child(egeoip_sup, Spec)
-                      end, Specs),
-            lookup(Address)
-    end;
+    Worker = get_worker(Address),
+    gen_server:call(Worker, {lookup, Address});
 lookup(Address) ->
     case ip2long(Address) of
         {ok, Ip} ->
@@ -163,7 +150,7 @@ record_fields() ->
 %% @spec filename() -> string()
 %% @doc Get the database filename currently being used by the server.
 filename() ->
-    gen_server:call(element(1, egeoip_sup:worker_names()), filename).
+    gen_server:call(element(1, egeoip_pool:worker_names()), filename).
 
 %% gen_server callbacks
 
@@ -220,7 +207,7 @@ handle_info(Info, State) ->
 %% Implementation
 get_worker(Address) ->
     element(1 + erlang:phash2(Address) band 7,
-            egeoip_sup:worker_names()).
+            egeoip_pool:worker_names()).
 
 log_error(Info) ->
     error_logger:info_report([?MODULE|Info]).

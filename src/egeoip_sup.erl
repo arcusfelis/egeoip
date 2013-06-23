@@ -8,37 +8,15 @@
 
 -export([start_link/0]).
 -export([init/1]).
--export([worker/2, worker_names/0]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    File = case application:get_env(egeoip, dbfile) of
-	       {ok, Other} ->
-		   Other;
-	       _ ->
-		   city
-	   end,
-    Processes = worker(tuple_to_list(worker_names()), File),
     SharedState = {shared_state,
       {egeoip_shared_state, start_link, []},
       permanent, 5000, worker, [egeoip_shared_state]},
-    {ok, {{one_for_all, 5, 300}, [SharedState|Processes]}}.
-
-worker_names() ->
-    {egeoip_0,
-     egeoip_1,
-     egeoip_2,
-     egeoip_3,
-     egeoip_4,
-     egeoip_5,
-     egeoip_6,
-     egeoip_7}.
-
-worker([], _File) ->
-    [];
-worker([Name | T], File) ->
-    [{Name,
-      {egeoip, start_link, [Name, File]},
-      permanent, 5000, worker, [egeoip]} | worker(T, File)].
+    Pool = {egeoip_pool,
+      {egeoip_pool, start_link, []},
+      permanent, 5000, supervisor, [egeoip_pool, egeoip_shared_state]},
+    {ok, {{one_for_all, 5, 300}, [SharedState, Pool]}}.
